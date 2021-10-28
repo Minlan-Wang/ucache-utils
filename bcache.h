@@ -6,11 +6,6 @@
 #include <assert.h>
 #include <stdint.h>
 
-struct cache_sb_info {
-	struct cache_sb *sb;
-	int fd;
-};
-
 struct jset_info {
 	struct list_head list;
 	struct jset jset[];
@@ -19,6 +14,19 @@ struct jset_info {
 struct bset_info {
 	struct list_head list;
 	struct bset bset[];
+};
+
+#define MAX_BSETS  4
+struct btree_node {
+	BKEY_PADDED(key);
+	struct btree_node *parent;
+	struct bset *bset[MAX_BSETS];
+};
+
+struct cache_sb_info {
+	struct cache_sb *sb;
+	struct btree_node root;
+	int fd;
 };
 
 static const uint64_t crc_table[256] = {
@@ -142,15 +150,15 @@ static const char bcache_magic[] = {
 
 uint64_t crc64(const void *_data, size_t len);
 
-#define node(i, j)		((void *) ((i)->d + (j)))
-#define end(i)			node(i, (i)->keys)
+#define xnode(i, j)		((void *) ((i)->d + (j)))
+#define xend(i)			xnode(i, (i)->keys)
 
 #define set_size(x) (sizeof(*x) + x->keys * sizeof(__u64))
 #define set_block(x, y) ((sizeof(*x) + x->keys * sizeof(__u64) + y - 1) / y)
 #define set_size_aligned(x, y) (set_block(x, y) * y)
 
 #define csum_set(i)							\
-	crc64(((void *) (i)) + 8, ((void *) end(i)) - (((void *) (i)) + 8))
+	crc64(((void *) (i)) + 8, ((void *) xend(i)) - (((void *) (i)) + 8))
 
 inline static size_t sector_to_bucket(struct cache_sb_info *sbi, sector_t s)
 {
@@ -160,6 +168,37 @@ inline static size_t sector_to_bucket(struct cache_sb_info *sbi, sector_t s)
 inline static sector_t bucket_to_sector(struct cache_sb_info *sbi, size_t b)
 {
 	return (sector_t)b * (sbi->sb->bucket_size);
+}
+
+static inline uint64_t crc64_be(uint64_t crc, const void *p, size_t len)
+{
+	size_t i, t;
+
+	const unsigned char *_p = p;
+
+	for (i = 0; i < len; i++) {
+		t = ((crc >> 56) ^ (*_p++)) & 0xFF;
+		crc = crc_table[t] ^ (crc << 8);
+	}
+
+	return crc;
+}
+
+static inline uint64_t bch_crc64_update(uint64_t crc,
+					const void *p,
+					size_t len)
+{
+	crc = crc64_be(crc, p, len);
+	return crc;
+}
+
+static uint64_t btree_csum_set(struct btree_node *b, struct bset *i)
+{
+	uint64_t crc = b->key.ptr[0];
+	void *data = (void *) i + 8, *end = xend(i);
+
+	crc = bch_crc64_update(crc, data, end - data);
+	return crc ^ 0xffffffffffffffffULL;
 }
 
 #define dump_xset_bkeys(xset)						\
@@ -211,7 +250,6 @@ void dump_sb(struct cache_sb *sb);
 void dump_bkey_verbose(struct bkey *key);
 void dump_bkey(struct bkey *key);
 
-int bucket_scan(struct cache_sb_info *sbi, int b, struct list_head *head);
-int sector_scan(struct cache_sb_info *sbi, long sector, struct list_head *head);
+int bset_bucket_dump(struct cache_sb_info *sbi, unsigned long b);
 
 #endif

@@ -30,19 +30,13 @@ void dump_bkey(struct bkey *key)
         KEY_SIZE(key), PTR_OFFSET(key, 0), KEY_DIRTY(key) ? "dirty": "clean");
 }
 
-void dump_bset_list_bkeys(struct list_head *head)
+/* TODO */
+int merged_node_dump(struct cache_sb_info *sbi, unsigned long b)
 {
-	struct bset_info *j;
-	struct bkey *k;
-
-	printf("dumping bset list.........\n");
-	list_for_each_entry(j, head, list) {
-		printf("jset seq %lu, keys %u\n", j->bset->seq, j->bset->keys);
-		dump_xset_bkeys(j->bset);
-	}
+	return 0;
 }
 
-int bucket_scan(struct cache_sb_info *sbi, int b, struct list_head *head)
+int bset_bucket_dump(struct cache_sb_info *sbi, unsigned long b)
 {
 	struct bset *bset;
 	int ret;
@@ -57,6 +51,7 @@ int bucket_scan(struct cache_sb_info *sbi, int b, struct list_head *head)
 	if (!bucket_buf)
 		return -1;
 
+	memset(bucket_buf, 0, bucket_size);
 	tmp = bucket_buf;
 	ret = pread(sbi->fd, bucket_buf, bucket_size, b * bucket_size);
 	if (ret < bucket_size) {
@@ -73,18 +68,19 @@ int bucket_scan(struct cache_sb_info *sbi, int b, struct list_head *head)
 		 * which causes segment false.
 		 */
 		if (bset->magic != bset_magic(sbi->sb)) {
-			goto out;
-		}
-
-		if (bset->csum != csum_set(bset)) {
-			printf("bucket %d csum 0x%lx, expect csum 0x%lx\n",
-					b, csum_set(bset), bset->csum);
+			printf("bset magic check failed.\n");
 			goto out;
 		}
 
 		if (bset->version != BCACHE_BSET_VERSION) {
 			printf("bucket %d, bad version 0x%lx\n",
 					b, bset->version);
+			goto out;
+		}
+
+		if (bset->csum != btree_csum_set(&sbi->root, bset)) {
+			printf("bucket %d csum 0x%lx, expect csum 0x%lx\n",
+					b, csum_set(bset), bset->csum);
 			goto out;
 		}
 
@@ -101,83 +97,10 @@ int bucket_scan(struct cache_sb_info *sbi, int b, struct list_head *head)
 		printf("bucket %d, offset %lu, bset size %d, left size %d, seq %lu\n",
 			b, bucket_size - left_size, set_size(bset), left_size, j->bset->seq);
 
-		left_size -= set_size_aligned(bset, block_size);
-		bucket_buf += set_size_aligned(bset, block_size);
-
-		list_add_tail(&j->list, head);
-
-	} while(left_size);
-
-	free(tmp);
-	return 0;
-out:
-	free(tmp);
-	return -1;
-}
-
-int sector_scan(struct cache_sb_info *sbi, long sector, struct list_head *head)
-{
-	struct bset *bset;
-	int ret;
-	int left_size;
-	struct bset_info *j, *i, *k;
-	struct bset_info *last;
-	unsigned long last_seq;
-	char *tmp;
-	int bucket_size = sbi->sb->bucket_size << 9;
-	int block_size = sbi->sb->block_size << 9;
-	char *bucket_buf = malloc(bucket_size);
-	if (!bucket_buf)
-		return -1;
-
-	tmp = bucket_buf;
-	ret = pread(sbi->fd, bucket_buf, bucket_size, sector << 9);
-	if (ret < bucket_size) {
-		fprintf(stderr, "bset sector %ld read failed.\n", sector);
-		goto out;
-	}
-
-	left_size = bucket_size;
-	do {
-		bset = (struct bset *)bucket_buf;
-
-		/*
-		 * keep magic check first. otherwisze csum_set() may get a invalid len
-		 * which causes segment false.
-		 */
-		if (bset->magic != bset_magic(sbi->sb)) {
-			goto out;
-		}
-
-		if (bset->csum != csum_set(bset)) {
-			printf("sector %d csum 0x%lx, expect csum 0x%lx\n",
-					sector, csum_set(bset), bset->csum);
-			goto out;
-		}
-
-		if (bset->version != BCACHE_BSET_VERSION) {
-			printf("sector %d, bad version 0x%lx\n",
-					sector, bset->version);
-			goto out;
-		}
-
-		if (left_size < set_size(bset))
-			break;
-
-		j = malloc(set_size(bset) + offsetof(struct bset_info, bset));
-		if (!j) {
-			fprintf(stderr, "Out of memory.\n");
-			break;
-		}
-		memcpy(j->bset, bset, set_size(bset));
-
-		printf("sector %d, offset %lu, bset size %d, left size %d, seq %lu\n",
-			sector, bucket_size - left_size, set_size(bset), left_size, j->bset->seq);
+		dump_xset_bkeys(bset);
 
 		left_size -= set_size_aligned(bset, block_size);
 		bucket_buf += set_size_aligned(bset, block_size);
-
-		list_add_tail(&j->list, head);
 
 	} while(left_size);
 

@@ -26,4 +26,5 @@ bset_parse: bset_parse.o journal.o super.o btree.o
 
 clean:
 	rm -rf *.o
-	rm -rf bkey_parse bset_parse bcache_super bcache_mount jset_parse journal_dump
+	rm -rf bkey_parse bset_parse bcache_super bcache_mount\
+		jset_parse journal_dump root_dump

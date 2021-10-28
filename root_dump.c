@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include "bcache.h"
+#include  <string.h>
 //#include <assert.h>
 
 /*
@@ -24,19 +25,16 @@ int main(int argc, char *argv[])
 	struct jset_info *j;
 	LIST_HEAD(replay_list);
 	int ret, ch;
+	struct bkey *k;
+	unsigned long b;
+	int merged;
 
-#if 0
-    while((ch = getopt(argc,argv,"b:s:"))!= EOF)
+    while((ch = getopt(argc,argv,"m"))!= EOF)
     {
         switch(ch)
         {
-            case 'b':
-				sscanf(optarg, "%d", &bucket);
-				printf("bucket  %lu\n", bucket);
-				break;
-            case 's':
-				sscanf(optarg, "%lu", &sector);
-				printf("sector  %lu\n", sector);
+            case 'm':
+				merged = 1;
 				break;
             default:
 				help_info();
@@ -51,9 +49,8 @@ int main(int argc, char *argv[])
 		help_info();
 		exit(1);
 	}
-#endif
 
-	cache_dev_fd = open(argv[1], O_RDONLY);
+	cache_dev_fd = open(argv[0], O_RDONLY);
 	if (cache_dev_fd < 0) {
 		fprintf(stderr, "cache dev open failed.\n");
 		return -1;
@@ -67,6 +64,17 @@ int main(int argc, char *argv[])
 
 	journal_read(&sbi, &replay_list);
 	dump_replay_list(&replay_list, false);
+
+	j = list_last_entry(&replay_list, struct jset_info, list);
+	bkey_copy(&sbi.root.key, &j->jset->btree_root);
+
+	b = sector_to_bucket(&sbi, PTR_OFFSET(&sbi.root.key, 0));
+	printf("root node bucket %d\n", b);
+
+	if (merged)
+		merged_node_dump(&sbi, b);
+	else
+		bset_bucket_dump(&sbi, b);
 
 	destroy_xset_list(&replay_list, struct jset_info);
 	close(cache_dev_fd);

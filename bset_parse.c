@@ -15,17 +15,16 @@ static void help_info(void)
 	printf("./bset_parse BUCKET CACHE_DEV\n");
 }
 
-/* ./bcache_mount CACHE_DEV */
+/* ./bset_parse CACHE_DEV */
 int main(int argc, char *argv[])
 {
 	int ch;
 	int cache_dev_fd;
 	struct cache_sb sb;
 	struct cache_sb_info sbi;
-	int bucket = -1;
+	unsigned long bucket = -1;
 	long sector = -1;
 	struct bset_info *j;
-	LIST_HEAD(bset_list);
 	int ret;
 
     while((ch = getopt(argc,argv,"b:s:"))!= EOF)
@@ -33,7 +32,7 @@ int main(int argc, char *argv[])
         switch(ch)
         {
             case 'b':
-				sscanf(optarg, "%d", &bucket);
+				sscanf(optarg, "%lu", &bucket);
 				printf("bucket  %lu\n", bucket);
 				break;
             case 's':
@@ -66,14 +65,10 @@ int main(int argc, char *argv[])
 	sbi.sb = &sb;
 	sbi.fd = cache_dev_fd;
 
-	if (bucket != -1)
-		bucket_scan(&sbi, bucket, &bset_list);
-	else if (sector != -1)
-		sector_scan(&sbi, sector, &bset_list);
+	if (sector != -1)
+		bucket = sector_to_bucket(&sbi, sector);
+	bset_bucket_dump(&sbi, bucket);
 
-	dump_bset_list_bkeys(&bset_list);
-
-	destroy_xset_list(&bset_list, struct bset_info);
 	close(cache_dev_fd);
 	return 0;
 out:
