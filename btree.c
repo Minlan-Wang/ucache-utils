@@ -40,11 +40,11 @@ int btree_node_dump(struct cache_sb_info *sbi, sector_t s)
 {
 	struct bset *bset;
 	int ret;
+	int bset_count = 0;
 	int left_size;
-	struct bset_info *j, *i, *k;
 	char *tmp;
-	int node_size = sbi->node_blocks << 9;
 	int block_size = sbi->sb->block_size << 9;
+	int node_size = sbi->node_blocks * block_size;
 	__u64 first_seq = 0;
 	char *node_buf = malloc(node_size);
 	if (!node_buf)
@@ -61,44 +61,54 @@ int btree_node_dump(struct cache_sb_info *sbi, sector_t s)
 	left_size = node_size;
 	do {
 		bset = (struct bset *)node_buf;
-
+		/* Nornal exit path */
+		if (first_seq == 0)
+			first_seq = bset->seq;
+		else if (first_seq != bset->seq)
+			break;
 		/*
 		 * keep magic check first. otherwisze csum_set() may get a invalid len
 		 * which causes segment false.
 		 */
 		if (bset->magic != bset_magic(sbi->sb)) {
-			printf("bset magic check failed.\n");
+			fprintf(stderr, "bset magic check failed.\n");
 			goto out;
 		}
 
 		if (bset->version != BCACHE_BSET_VERSION) {
-			printf("sector %lu, bad version 0x%lx\n",
-					sbrk, bset->version);
+			fprintf(stderr, "sector %lu, bad version 0x%lx\n",
+					s, bset->version);
 			goto out;
 		}
 
 		if (bset->csum != btree_csum_set(&sbi->root, bset)) {
-			printf("sector %lu csum 0x%lx, expect csum 0x%lx\n",
+			fprintf(stderr, "sector %lu csum 0x%lx, expect csum 0x%lx\n",
 					s, csum_set(bset), bset->csum);
 			goto out;
 		}
 
-		if (left_size < set_size(bset))
-			break;
+		if (left_size < set_size(bset)) {
+			fprintf(stderr, "bset too big(%d), sector %lu\n", set_size(bset), s);
+			goto out;
+		}
 
-		if (first_seq == 0)
-			first_seq = bset->seq;
-		else if (first_seq != bset->seq)
-			break;
+		/* first bset has a chance to be written without any keys */
+		if ((bset != (struct bset *)node_buf) && (bset->keys == 0)) {
+			fprintf(stderr, "empty bset, sector %lu\n", s);
+			goto out;
+		}
 
-		printf("sector %d, bset size %d, seq %lu\n", s, set_size(bset), bset->seq);
-
+		printf("sector %d, bset size %d, seq %lu, keys %u\n", s, set_size(bset),
+			bset->seq, bset->keys);
 		dump_xset_bkeys(bset);
 
 		left_size -= set_size_aligned(bset, block_size);
 		node_buf += set_size_aligned(bset, block_size);
+		bset_count++;
+		s += set_blocks(bset, sbi->sb->block_size << 9);
 	} while(left_size);
 
+	printf("scanned %d bsets\n", bset_count);
 	free(tmp);
 	return 0;
 out:

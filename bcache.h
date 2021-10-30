@@ -20,7 +20,9 @@ struct bset_info {
 struct btree_node {
 	BKEY_PADDED(key);
 	struct btree_node *parent;
+	/* raw bset */
 	struct bset *bset[MAX_BSETS];
+	struct bset *sorted;
 };
 
 struct cache_sb_info {
@@ -157,8 +159,8 @@ uint64_t crc64(const void *_data, size_t len);
 #define xend(i)			xnode(i, (i)->keys)
 
 #define set_size(x) (sizeof(*x) + x->keys * sizeof(__u64))
-#define set_block(x, y) ((sizeof(*x) + x->keys * sizeof(__u64) + y - 1) / y)
-#define set_size_aligned(x, y) (set_block(x, y) * y)
+#define set_blocks(x, y) ((sizeof(*x) + x->keys * sizeof(__u64) + y - 1) / y)
+#define set_size_aligned(x, y) (set_blocks(x, y) * y)
 
 #define csum_set(i)							\
 	crc64(((void *) (i)) + 8, ((void *) xend(i)) - (((void *) (i)) + 8))
@@ -255,5 +257,5 @@ void dump_bkey(struct bkey *key);
 
 int bset_bucket_dump(struct cache_sb_info *sbi, unsigned long b);
 int btree_node_dump(struct cache_sb_info *sbi, sector_t s);
-
+int merged_node_dump(struct cache_sb_info *sbi, sector_t s);
 #endif
