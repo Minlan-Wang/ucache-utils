@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
 	int ret, ch;
 	struct bkey *k;
 	unsigned long b;
+	unsigned int node_blocks;
 	int merged;
 
     while((ch = getopt(argc,argv,"m"))!= EOF)
@@ -62,6 +63,12 @@ int main(int argc, char *argv[])
 	sbi.sb = &sb;
 	sbi.fd = cache_dev_fd;
 
+	node_blocks = sb.bucket_size / sb.block_size;
+
+	if (sb.bucket_size > BTREE_MAX_SECTORS)
+		 sbi.node_blocks = max_t(unsigned int, node_blocks / 4,
+			BTREE_MAX_SECTORS / sb.block_size);
+
 	journal_read(&sbi, &replay_list);
 	dump_replay_list(&replay_list, false);
 
@@ -69,12 +76,12 @@ int main(int argc, char *argv[])
 	bkey_copy(&sbi.root.key, &j->jset->btree_root);
 
 	b = sector_to_bucket(&sbi, PTR_OFFSET(&sbi.root.key, 0));
-	printf("root node bucket %d\n", b);
+	printf("root node bucket %d, blocks %u\n", b, sbi.node_blocks);
 
 	if (merged)
 		merged_node_dump(&sbi, b);
 	else
-		bset_bucket_dump(&sbi, b);
+		btree_node_dump(&sbi, PTR_OFFSET(&sbi.root.key, 0));
 
 	destroy_xset_list(&replay_list, struct jset_info);
 	close(cache_dev_fd);

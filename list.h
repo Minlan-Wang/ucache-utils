@@ -9,6 +9,23 @@
 #include <stdbool.h>
 #include "compiler.h"
 
+#define __cmp(x, y, op)	((x) op (y) ? (x) : (y))
+/**
+ * min_t - return minimum of two values, using the specified type
+ * @type: data type to use
+ * @x: first value
+ * @y: second value
+ */
+#define min_t(type, x, y)	__cmp((type)(x), (type)(y), <)
+
+/**
+ * max_t - return maximum of two values, using the specified type
+ * @type: data type to use
+ * @x: first value
+ * @y: second value
+ */
+#define max_t(type, x, y)	__cmp((type)(x), (type)(y), >)
+
 #define POISON_POINTER_DELTA 0
 /*
  * These are non-NULL pointers that will result in page faults

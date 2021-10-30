@@ -79,6 +79,7 @@ static inline void SET_KEY_OFFSET(struct bkey *k, __u64 v)
 #define MAX_KEY_INODE			(~(~0 << 20))
 #define MAX_KEY_OFFSET			(~0ULL >> 1)
 #define MAX_KEY				KEY(MAX_KEY_INODE, MAX_KEY_OFFSET, 0)
+#define ROOT_KEY			MAX_KEY
 
 #define KEY_START(k)			(KEY_OFFSET(k) - KEY_SIZE(k))
 #define START_KEY(k)			KEY(KEY_INODE(k), KEY_START(k), 0)

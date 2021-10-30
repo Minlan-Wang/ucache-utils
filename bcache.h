@@ -26,6 +26,7 @@ struct btree_node {
 struct cache_sb_info {
 	struct cache_sb *sb;
 	struct btree_node root;
+	unsigned int node_blocks;
 	int fd;
 };
 
@@ -144,6 +145,8 @@ static const char bcache_magic[] = {
 #define SECTOR_BITS 9
 #define KB_BITS		10
 #define JSET_BITS		3
+/* 256KB */
+#define BTREE_MAX_SECTORS	(256 << 1)
 
 #define PAGE_SIZE 4096
 #define PAGE_SECTORS		(PAGE_SIZE / 512)
@@ -251,5 +254,6 @@ void dump_bkey_verbose(struct bkey *key);
 void dump_bkey(struct bkey *key);
 
 int bset_bucket_dump(struct cache_sb_info *sbi, unsigned long b);
+int btree_node_dump(struct cache_sb_info *sbi, sector_t s);
 
 #endif
