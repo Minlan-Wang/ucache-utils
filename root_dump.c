@@ -74,9 +74,11 @@ int main(int argc, char *argv[])
 
 	j = list_last_entry(&replay_list, struct jset_info, list);
 	bkey_copy(&sbi.root.key, &j->jset->btree_root);
+	sbi.root.btree_level = j->jset->btree_level;
 
 	b = sector_to_bucket(&sbi, PTR_OFFSET(&sbi.root.key, 0));
-	printf("root node bucket %d, blocks %u\n", b, sbi.node_blocks);
+	printf("root node bucket %d, blocks %u, level %u\n", b, sbi.node_blocks,
+		sbi.root.btree_level);
 
 	if (merged)
 		merged_node_dump(&sbi, b);

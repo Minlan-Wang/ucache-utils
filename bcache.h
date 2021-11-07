@@ -19,6 +19,7 @@ struct bset_info {
 #define MAX_BSETS  4
 struct btree_node {
 	BKEY_PADDED(key);
+	int btree_level;
 	struct btree_node *parent;
 	/* raw bset */
 	struct bset *bset[MAX_BSETS];
