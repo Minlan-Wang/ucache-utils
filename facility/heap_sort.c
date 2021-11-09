@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* 实现min heap */
+/* 实现max heap */
+
 #define heap_full(h)	((h)->used == (h)->size)
 #if 0
 #define DECLARE_HEAP(type, name)					\
@@ -83,34 +84,20 @@ do {									\
 #define heap_peek(h)	((h)->used ? (h)->data[0] : NULL)
 
 #else
-/*
- * 下标和父子关系
- * A B C D E F G
- * 0 1 2 3 4 5 6
- * 一个节点当前index为x(x > 0), 的父节点index为(x - 1)/2.
- * 一个节点当前index为x,子节点的index为(2x+1), 2x+2
-*/
-
-/* 以key排序(最小堆),key可能相同 */
-struct kv {
-	unsigned long key;
-	unsigned long value;
-};
 
 struct heap_t {
 	int size, used;
-	struct kv *data;
+	unsigned long *data;
 };
 
-typedef long (cmp_t)(struct kv a, struct kv b);
+typedef int (cmp_t)(unsigned long a, unsigned long b);
 
-/* 最小堆 */
-long foo_cmp(struct kv a, struct kv b)
+int foo_cmp(unsigned long a, unsigned long b)
 {
-	return ((long)a.key - (long)b.key) > 0;
+	return a < b;
 }
 
-struct kv* init_heap(struct heap_t *heap, int _size)
+unsigned long* init_heap(struct heap_t *heap, int _size)
 {
 	int _bytes;
 
@@ -130,7 +117,7 @@ void free_heap(struct heap_t *heap)
 
 void heap_swap(struct heap_t *h, int i, int j)
 {
-	struct kv t;
+	unsigned long t;
 
 	t = h->data[i];
 	h->data[i] = h->data[j];
@@ -142,7 +129,6 @@ void heap_sift(struct heap_t *h, int i, cmp_t *cmp)
 {
 	int _r, _j = i;
 
-	/* _j * 2 + 1是左节点的index */
 	for (; _j * 2 + 1 < h->used; _j = _r) {
 		/* _j的left child */
 		_r = _j * 2 + 1;
@@ -152,7 +138,7 @@ void heap_sift(struct heap_t *h, int i, cmp_t *cmp)
 		    cmp(h->data[_r], h->data[_r + 1]))
 			_r++;
 
-		/* 较大的那个child如果大于_j,表示符合min heap规则,可以退出*/
+		/* 较大的那个child如果小于_j,表示符合max heap规则,可以退出*/
 		if (cmp(h->data[_r], h->data[_j]))
 			break;
 		/* 否则_j和大的那个child交换 */
@@ -161,14 +147,14 @@ void heap_sift(struct heap_t *h, int i, cmp_t *cmp)
 }
 
 /* 从i往root方向swap */
-int heap_sift_down(struct heap_t *h, int i, cmp_t *cmp)
+void heap_sift_down(struct heap_t *h, int i, cmp_t *cmp)
 {
 	int p;
 
 	while (i) {
 		/* 找到父节点 */
 		p = (i - 1) / 2;
-		/* 如果当前节点大于于父节点, 就退出*/
+		/* 如果当前节点小于父节点, 就退出*/
 		if (cmp(h->data[i], h->data[p]))
 			break;
 		/* 如果当前节点大于父节点,交换父节点和当前节点 */
@@ -176,10 +162,10 @@ int heap_sift_down(struct heap_t *h, int i, cmp_t *cmp)
 		i = p;
 	}
 
-	return i;
+	return;
 }
 
-int heap_add(struct heap_t *h, struct kv d, cmp_t *cmp)
+int heap_add(struct heap_t *h, int d, cmp_t *cmp)
 {
 	int _r = !heap_full(h);
 	if (_r) {
@@ -187,15 +173,14 @@ int heap_add(struct heap_t *h, struct kv d, cmp_t *cmp)
 		int _i = h->used++;
 		(h)->data[_i] = d;
 
-		_i = heap_sift_down(h, _i, cmp);
-		/* 为了处理相同key的情况. */
-		heap_sift(h, _i, cmp);
+		heap_sift_down(h, _i, cmp);
+		//heap_sift(h, _i, cmp);
 	}
 
 	return _r;
 }
 
-int heap_pop(struct heap_t *h, struct kv *d, cmp_t *cmp)
+int heap_pop(struct heap_t *h, unsigned long *d, cmp_t *cmp)
 {
 	int _r = h->used;
 
@@ -219,16 +204,9 @@ int heap_pop(struct heap_t *h, struct kv *d, cmp_t *cmp)
 int main()
 {
 	int i;
-	struct kv v;
+	unsigned long v;
 	struct heap_t heap;
-	struct kv array[TEST_NUM] = {{10, 1}, {15, 1}, {12, 1},
-					{40, 1}, {15, 2}, {18, 1}, {90, 1},
-					{70, 1}, {15, 3}, {10, 2}};
-#if 0
-    /* real situation */
-	struct kv array[TEST_NUM] = {{87920, 2850816}, {0, 2890752}, {0, 2868224},
-					{0, 1294336}, {0, 801792}};
-#endif
+	unsigned long array[TEST_NUM] = {10, 20, 15, 12, 40, 25, 18, 90, 70, 80};
 
 	init_heap(&heap, TEST_NUM);
 
@@ -238,13 +216,13 @@ int main()
 
 	printf("print heap ############\n");
 	for (i = 0; i < TEST_NUM; i++) {
-		printf("%lu %lu\n", heap.data[i].key, heap.data[i].value);
+		printf("%lu\n", heap.data[i]);
 	}
 
 	printf("heap sort #############\n");
 	for (i = 0; i < TEST_NUM; i++) {
 		heap_pop(&heap, &v, foo_cmp);
-		printf("%lu %lu\n", v.key, v.value);
+		printf("%lu\n", v);
 	}
     return 0;
 }
